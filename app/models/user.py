@@ -17,3 +17,6 @@ class UserDocument(MongoBaseDocument):
     profile_photo: Optional[str] = Field(
         None, description="URL of the profile photo"
     )
+    fcm_tokens: list[str] = Field(
+        default_factory=list, description="FCM device tokens for push notifications"
+    )

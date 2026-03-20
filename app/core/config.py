@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +21,10 @@ class Settings(BaseSettings):
     # MongoDB Settings
     MONGODB_URL: str
     DATABASE_NAME: str
+
+    # Firebase Settings
+    FIREBASE_PROJECT_ID: str = ""
+    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"

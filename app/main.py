@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
-from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION, DRIVERS_COLLECTION, VEHICLES_COLLECTION, ROUTES_COLLECTION
+from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION, DRIVERS_COLLECTION, VEHICLES_COLLECTION, ROUTES_COLLECTION, BOOKINGS_COLLECTION, NOTIFICATIONS_COLLECTION
 from app.routes.v1 import v1_router
 
 
@@ -42,6 +42,21 @@ async def lifespan(app: FastAPI):
     await db_instance.db[ROUTES_COLLECTION].create_index(
         [("name", "text"), ("origin.name", "text"), ("destination.name", "text")]
     )
+    # Booking indexes
+    await db_instance.db[BOOKINGS_COLLECTION].create_index("passenger_id")
+    await db_instance.db[BOOKINGS_COLLECTION].create_index("driver_id")
+    await db_instance.db[BOOKINGS_COLLECTION].create_index("route_id")
+    await db_instance.db[BOOKINGS_COLLECTION].create_index(
+        [("vehicle_id", 1), ("route_id", 1), ("trip_date", 1), ("status", 1)]
+    )
+    await db_instance.db[BOOKINGS_COLLECTION].create_index("status")
+    await db_instance.db[BOOKINGS_COLLECTION].create_index("scheduled_at")
+    # Notification indexes
+    await db_instance.db[NOTIFICATIONS_COLLECTION].create_index("user_id")
+    await db_instance.db[NOTIFICATIONS_COLLECTION].create_index("is_read")
+    await db_instance.db[NOTIFICATIONS_COLLECTION].create_index("created_at")
+    # User fcm_tokens index
+    await db_instance.db[USERS_COLLECTION].create_index("fcm_tokens")
 
     yield
 

@@ -8,6 +8,7 @@ VEHICLES_COLLECTION = "vehicles"
 ROUTES_COLLECTION = "routes"
 BOOKINGS_COLLECTION = "bookings"
 OTP_COLLECTION = "otps"
+NOTIFICATIONS_COLLECTION = "notifications"
 
 
 class Database:

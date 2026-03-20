@@ -3,6 +3,7 @@ from app.models.driver import DriverDocument
 from app.models.vehicle import VehicleDocument
 from app.models.route import RouteDocument
 from app.models.booking import BookingDocument
+from app.models.notification import NotificationDocument
 from app.models.base import MongoBaseDocument, PyObjectId
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "VehicleDocument",
     "RouteDocument",
     "BookingDocument",
+    "NotificationDocument",
 ]

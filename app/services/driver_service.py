@@ -1,5 +1,7 @@
 """Driver service — all business logic for driver module."""
 
+import logging
+
 from datetime import datetime
 from typing import Any, Optional
 
@@ -19,6 +21,9 @@ from app.enums.common import (
 )
 from app.schemas.driver import DriverCreate, DriverResponse, DriverUpdate
 from app.schemas.vehicle import VehicleCreate, VehicleResponse, VehicleUpdate
+from app.services import notification_service
+
+logger = logging.getLogger(__name__)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -365,6 +370,20 @@ async def approve_driver(driver_id: str, db: Any) -> DriverResponse:
     )
 
     updated = await db[DRIVERS_COLLECTION].find_one({"_id": obj_id})
+
+    # Notify driver
+    try:
+        await notification_service.send_push_notification(
+            driver["user_id"],
+            "Application Approved",
+            "Congratulations! Your driver application has been approved. You can now start accepting rides.",
+            db,
+            notification_type="driver_approval",
+            reference_id=driver_id,
+        )
+    except Exception as e:
+        logger.error(f"Notification error on driver approval: {e}")
+
     return DriverResponse(**updated)
 
 
@@ -393,4 +412,19 @@ async def suspend_driver(
     )
 
     updated = await db[DRIVERS_COLLECTION].find_one({"_id": obj_id})
+
+    # Notify driver
+    try:
+        await notification_service.send_push_notification(
+            driver["user_id"],
+            "Account Suspended",
+            "Your driver account has been suspended. Please contact support.",
+            db,
+            data={"reason": reason},
+            notification_type="driver_approval",
+            reference_id=driver_id,
+        )
+    except Exception as e:
+        logger.error(f"Notification error on driver suspension: {e}")
+
     return DriverResponse(**updated)
