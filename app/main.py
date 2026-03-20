@@ -6,12 +6,13 @@ from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
-from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION, DRIVERS_COLLECTION, VEHICLES_COLLECTION
+from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION, DRIVERS_COLLECTION, VEHICLES_COLLECTION, ROUTES_COLLECTION
 from app.routes.v1 import v1_router
 
 
 # Ensure upload directories exist before StaticFiles validates them
 os.makedirs(os.path.join("uploads", "profiles"), exist_ok=True)
+os.makedirs(os.path.join("uploads", "routes"), exist_ok=True)
 
 
 @asynccontextmanager
@@ -33,6 +34,14 @@ async def lifespan(app: FastAPI):
     await db_instance.db[VEHICLES_COLLECTION].create_index("registration_number", unique=True)
     # Vehicle: index on driver_id for lookup
     await db_instance.db[VEHICLES_COLLECTION].create_index("driver_id")
+    # Route: unique slug
+    await db_instance.db[ROUTES_COLLECTION].create_index("slug", unique=True)
+    # Route: index on is_active for filtering
+    await db_instance.db[ROUTES_COLLECTION].create_index("is_active")
+    # Route: text index for search
+    await db_instance.db[ROUTES_COLLECTION].create_index(
+        [("name", "text"), ("origin.name", "text"), ("destination.name", "text")]
+    )
 
     yield
 
