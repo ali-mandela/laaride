@@ -1,0 +1,45 @@
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+from app.enums.common import VehicleType
+
+
+class VehicleCreate(BaseModel):
+    """Schema for registering a new vehicle."""
+
+    driver_id: str = Field(..., description="Reference to Driver")
+    vehicle_type: VehicleType = Field(..., description="Type of vehicle")
+    make: str = Field(..., description="Vehicle make (e.g. Innova)")
+    model: str = Field(..., description="Vehicle model")
+    year: int = Field(..., description="Manufacturing year")
+    registration_number: str = Field(
+        ..., description="Unique registration number"
+    )
+    capacity: int = Field(..., description="Passenger capacity")
+
+
+class VehicleUpdate(BaseModel):
+    """Schema for updating vehicle details."""
+
+    is_active: Optional[bool] = Field(None, description="Whether the vehicle is active")
+    capacity: Optional[int] = Field(None, description="Passenger capacity")
+
+
+class VehicleResponse(BaseModel):
+    """Schema for vehicle API response."""
+
+    id: Optional[str] = Field(None, alias="_id")
+    driver_id: str
+    vehicle_type: VehicleType
+    make: str
+    model: str
+    year: int
+    registration_number: str
+    capacity: int
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"populate_by_name": True}
