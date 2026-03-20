@@ -1,20 +1,20 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RouteCreate(BaseModel):
     """Schema for creating a new route."""
 
-    name: str = Field(..., description="Route name (e.g. 'Leh to Kargil')")
+    name: str = Field(..., min_length=3, max_length=200, description="Route name (e.g. 'Leh to Kargil')")
     origin: dict = Field(..., description="Origin with name, lat, lng")
     destination: dict = Field(..., description="Destination with name, lat, lng")
-    distance_km: float = Field(..., description="Distance in kilometers")
+    distance_km: float = Field(..., gt=0, description="Distance in kilometers")
     estimated_duration_mins: int = Field(
-        ..., description="Estimated travel duration in minutes"
+        ..., gt=0, description="Estimated travel duration in minutes"
     )
-    base_fare: float = Field(..., description="Base fare for this route")
+    base_fare: float = Field(..., gt=0, description="Base fare for this route")
     waypoints: list[dict] = Field(
         default_factory=list,
         description="Stops along the route with name, lat, lng, order, distance_from_origin_km",
@@ -23,6 +23,11 @@ class RouteCreate(BaseModel):
     is_seasonal: bool = Field(default=False, description="Whether route is seasonal")
     season_start_month: Optional[int] = Field(None, description="Season start month (1-12)")
     season_end_month: Optional[int] = Field(None, description="Season end month (1-12)")
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, v: str) -> str:
+        return v.strip()
 
 
 class RouteUpdate(BaseModel):

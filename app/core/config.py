@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
 
+    # CORS
+    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
+
+    # Rate Limiting
+    RATE_LIMIT_ENABLED: bool = True
+    REDIS_URL: Optional[str] = None
+
+    # Logging
+    LOG_LEVEL: str = "INFO"
+
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
     )

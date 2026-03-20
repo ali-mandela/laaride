@@ -1,7 +1,8 @@
+import re
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.enums.common import AvailabilityStatus, DriverStatus
 
@@ -11,6 +12,14 @@ class DriverCreate(BaseModel):
 
     license_number: str = Field(..., description="Driver's license number")
     license_expiry: date = Field(..., description="License expiry date")
+
+    @field_validator("license_number")
+    @classmethod
+    def validate_license(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.match(r"^[A-Z0-9]+$", v):
+            raise ValueError("License number must be alphanumeric")
+        return v
 
 
 class DriverUpdate(BaseModel):

@@ -38,3 +38,18 @@ class VehicleType(str, Enum):
     TEMPO_TRAVELLER = "tempo_traveller"
     BUS = "bus"
     BIKE = "bike"
+
+
+class PaymentStatus(str, Enum):
+    UNPAID = "unpaid"
+    PENDING_CASH = "pending_cash"
+    PAYMENT_INITIATED = "payment_initiated"
+    PAID = "paid"
+    REFUNDED = "refunded"
+    FAILED = "failed"
+
+
+class PaymentMethod(str, Enum):
+    ONLINE = "online"
+    CASH = "cash"
+

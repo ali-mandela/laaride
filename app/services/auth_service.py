@@ -3,10 +3,10 @@ import string
 from datetime import datetime, timedelta
 from typing import Any, Tuple
 
-from fastapi import HTTPException, status
-
 from app.core.config import settings
 from app.core.database import USERS_COLLECTION, OTP_COLLECTION
+from app.core.exceptions import AuthenticationError, ValidationError, NotFoundError
+from app.core.logging import get_logger
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -23,6 +23,15 @@ from app.schemas.auth import (
 )
 from app.schemas.user import UserResponse
 from app.enums.common import UserRole
+
+logger = get_logger("laaride.auth")
+
+
+def _mask_phone(phone: str) -> str:
+    """Mask phone for logging: +91****1234"""
+    if len(phone) > 6:
+        return phone[:3] + "****" + phone[-4:]
+    return "****"
 
 
 async def send_otp(phone: str, db: Any) -> SendOTPResponse:
@@ -45,6 +54,8 @@ async def send_otp(phone: str, db: Any) -> SendOTPResponse:
     )
     await db[OTP_COLLECTION].insert_one(otp_doc.model_dump(by_alias=True, exclude_none=True))
 
+    logger.info("otp_sent", phone=_mask_phone(phone))
+
     message = f"OTP sent to {phone}"
     return SendOTPResponse(
         message=message,
@@ -65,16 +76,12 @@ async def verify_otp(phone: str, otp: str, db: Any) -> VerifyOTPResponse:
     )
 
     if not otp_data:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="OTP expired or not found"
-        )
+        logger.warning("otp_verification_failed", phone=_mask_phone(phone), reason="expired_or_not_found")
+        raise ValidationError(message="OTP expired or not found", code="OTP_EXPIRED")
 
     if not security_verify_otp(otp, otp_data["otp_hash"]):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OTP"
-        )
+        logger.warning("otp_verification_failed", phone=_mask_phone(phone), reason="invalid_otp")
+        raise ValidationError(message="Invalid OTP", code="INVALID_OTP")
 
     # Mark OTP as used
     await db[OTP_COLLECTION].update_one(
@@ -90,18 +97,20 @@ async def verify_otp(phone: str, otp: str, db: Any) -> VerifyOTPResponse:
         is_new_user = True
         new_user = UserDocument(
             phone=phone,
-            name="New User",  # Placeholder, should be updated by user later
+            name="New User",
             role=UserRole.PASSENGER
         )
         result = await db[USERS_COLLECTION].insert_one(new_user.model_dump(by_alias=True, exclude_none=True))
         user_data = await db[USERS_COLLECTION].find_one({"_id": result.inserted_id})
 
     user = UserDocument(**user_data)
-    
+
     # Generate tokens
     user_id = str(user.id)
     access_token = create_access_token(data={"sub": user_id})
     refresh_token = create_refresh_token(data={"sub": user_id})
+
+    logger.info("login_success", user_id=user_id, is_new_user=is_new_user, phone=_mask_phone(phone))
 
     return VerifyOTPResponse(
         access_token=access_token,
@@ -114,30 +123,21 @@ async def verify_otp(phone: str, otp: str, db: Any) -> VerifyOTPResponse:
 async def refresh_access_token(token: str, db: Any) -> RefreshTokenResponse:
     """Refresh an access token using a valid refresh token."""
     payload = verify_token(token)
-    
+
     if payload.get("type") != "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type"
-        )
-    
+        raise AuthenticationError(message="Invalid token type", code="INVALID_TOKEN_TYPE")
+
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token payload"
-        )
-    
-    # Optional: Check if user still exists/is active
+        raise AuthenticationError(message="Invalid refresh token payload", code="INVALID_TOKEN")
+
+    # Check if user still exists/is active
     user_data = await db[USERS_COLLECTION].find_one({"_id": user_id})
     if not user_data or not user_data.get("is_active", True):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or inactive"
-        )
+        raise AuthenticationError(message="User not found or inactive", code="USER_INACTIVE")
 
     new_access_token = create_access_token(data={"sub": user_id})
-    
+
     return RefreshTokenResponse(
         access_token=new_access_token
     )

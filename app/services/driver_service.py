@@ -1,7 +1,5 @@
 """Driver service — all business logic for driver module."""
 
-import logging
-
 from datetime import datetime
 from typing import Any, Optional
 
@@ -13,6 +11,8 @@ from app.core.database import (
     USERS_COLLECTION,
     VEHICLES_COLLECTION,
 )
+from app.core.exceptions import NotFoundError, ValidationError, AuthorizationError, ConflictError
+from app.core.logging import get_logger
 from app.enums.common import (
     AvailabilityStatus,
     DriverStatus,
@@ -23,7 +23,7 @@ from app.schemas.driver import DriverCreate, DriverResponse, DriverUpdate
 from app.schemas.vehicle import VehicleCreate, VehicleResponse, VehicleUpdate
 from app.services import notification_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger("laaride.driver")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -34,10 +34,7 @@ def _to_object_id(value: str, label: str = "ID") -> ObjectId:
     try:
         return ObjectId(value)
     except errors.InvalidId:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {label} format",
-        )
+        raise ValidationError(message=f"Invalid {label} format", code="INVALID_ID")
 
 
 def _generate_seat_layout(vehicle_type: VehicleType) -> Optional[dict]:

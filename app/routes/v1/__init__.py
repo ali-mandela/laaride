@@ -8,6 +8,7 @@ from .routes import router as routes_router
 from .bookings import router as bookings_router
 from .notifications import router as notifications_router
 from .admin import router as admin_router
+from .search import router as search_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -19,4 +20,5 @@ v1_router.include_router(routes_router, prefix="/routes")
 v1_router.include_router(bookings_router, prefix="/bookings")
 v1_router.include_router(notifications_router, prefix="/notifications")
 v1_router.include_router(admin_router, prefix="/admin")
+v1_router.include_router(search_router, prefix="/search")
 

@@ -15,4 +15,6 @@ dependencies = [
     "python-multipart>=0.0.22",
     "bcrypt==4.0.1",
     "requests>=2.32.5",
+    "structlog>=25.5.0",
+    "slowapi>=0.1.9",
 ]

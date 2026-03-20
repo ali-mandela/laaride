@@ -1,7 +1,5 @@
 """Booking service — all business logic for the booking module."""
 
-import logging
-
 from datetime import date, datetime
 from typing import Any, Optional
 
@@ -15,6 +13,8 @@ from app.core.database import (
     USERS_COLLECTION,
     VEHICLES_COLLECTION,
 )
+from app.core.exceptions import NotFoundError, ValidationError, ConflictError, AuthorizationError
+from app.core.logging import get_logger
 from app.enums.common import (
     AvailabilityStatus,
     BookingStatus,
@@ -31,7 +31,7 @@ from app.schemas.booking import (
 )
 from app.services import notification_service
 
-logger = logging.getLogger(__name__)
+logger = get_logger("laaride.booking")
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -41,10 +41,7 @@ def _to_object_id(value: str, label: str = "ID") -> ObjectId:
     try:
         return ObjectId(value)
     except errors.InvalidId:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {label} format",
-        )
+        raise ValidationError(message=f"Invalid {label} format", code="INVALID_ID")
 
 
 def _all_seats_from_layout(seat_layout: Optional[dict]) -> list[str]:

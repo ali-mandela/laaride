@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import Field
 
-from app.enums.common import BookingStatus, BookingType, VehicleType
+from app.enums.common import BookingStatus, BookingType, PaymentMethod, PaymentStatus, VehicleType
 from app.models.base import MongoBaseDocument
 
 

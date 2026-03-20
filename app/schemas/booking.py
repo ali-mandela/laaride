@@ -1,7 +1,7 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.enums.common import BookingStatus, BookingType, VehicleType
 from app.models.base import PyObjectId
@@ -21,7 +21,19 @@ class FixedRouteBookingCreate(BaseModel):
     )
     trip_date: date = Field(..., description="Date of trip (must be future)")
     scheduled_at: datetime = Field(..., description="Scheduled departure time")
-    notes: Optional[str] = Field(None, description="Additional notes")
+    notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
+
+    @field_validator("notes")
+    @classmethod
+    def strip_notes(cls, v):
+        return v.strip() if v else v
+
+    @field_validator("scheduled_at")
+    @classmethod
+    def validate_scheduled(cls, v: datetime) -> datetime:
+        if v < datetime.utcnow() + timedelta(minutes=30):
+            raise ValueError("Scheduled time must be at least 30 minutes in the future")
+        return v
 
 
 class CustomTripBookingCreate(BaseModel):
@@ -37,7 +49,19 @@ class CustomTripBookingCreate(BaseModel):
     preferred_vehicle_type: Optional[VehicleType] = Field(
         None, description="Preferred vehicle type"
     )
-    notes: Optional[str] = Field(None, description="Additional notes")
+    notes: Optional[str] = Field(None, max_length=500, description="Additional notes")
+
+    @field_validator("notes")
+    @classmethod
+    def strip_notes(cls, v):
+        return v.strip() if v else v
+
+    @field_validator("scheduled_at")
+    @classmethod
+    def validate_scheduled(cls, v: datetime) -> datetime:
+        if v < datetime.utcnow() + timedelta(minutes=30):
+            raise ValueError("Scheduled time must be at least 30 minutes in the future")
+        return v
 
 
 # ── Update schemas ─────────────────────────────────────────────────────────

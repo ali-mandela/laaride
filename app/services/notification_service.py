@@ -1,18 +1,18 @@
 """Notification service — FCM push notifications + in-app notification management."""
 
 import json
-import logging
 from datetime import datetime
 from typing import Any, Optional
 
 from bson import ObjectId, errors
-from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.core.database import NOTIFICATIONS_COLLECTION, USERS_COLLECTION
+from app.core.exceptions import NotFoundError, ValidationError
+from app.core.logging import get_logger
 from app.schemas.notification import NotificationResponse
 
-logger = logging.getLogger(__name__)
+logger = get_logger("laaride.notification")
 
 MAX_FCM_TOKENS_PER_USER = 5
 
@@ -24,10 +24,7 @@ def _to_object_id(value: str, label: str = "ID") -> ObjectId:
     try:
         return ObjectId(value)
     except errors.InvalidId:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {label} format",
-        )
+        raise ValidationError(message=f"Invalid {label} format", code="INVALID_ID")
 
 
 # ── FCM Token Management ──────────────────────────────────────────────────
@@ -36,16 +33,12 @@ def _to_object_id(value: str, label: str = "ID") -> ObjectId:
 async def register_fcm_token(user_id: str, token: str, db: Any) -> dict:
     """Add FCM token to user's token list. Max 5 per user (oldest removed)."""
     if not token or not token.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="FCM token cannot be empty"
-        )
+        raise ValidationError(message="FCM token cannot be empty", code="INVALID_TOKEN")
 
     obj_id = _to_object_id(user_id, "User ID")
     user = await db[USERS_COLLECTION].find_one({"_id": obj_id})
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise NotFoundError(message="User not found", code="USER_NOT_FOUND")
 
     fcm_tokens = user.get("fcm_tokens", [])
 
@@ -126,17 +119,17 @@ async def _send_fcm_message(token: str, title: str, body: str, data: Optional[di
             return True
         elif resp.status_code in (400, 404):
             # Invalid token — should be removed
-            logger.warning(f"Invalid FCM token: {token[:20]}... — will be removed")
+            logger.warning("invalid_fcm_token", token_prefix=token[:20])
             return False
         else:
-            logger.error(f"FCM send failed: {resp.status_code} {resp.text}")
+            logger.error("fcm_send_failed", status_code=resp.status_code)
             return False
 
     except ImportError:
-        logger.info("google-auth / httpx not installed — FCM disabled")
+        logger.info("fcm_not_installed")
         return False
     except Exception as e:
-        logger.error(f"FCM send error: {e}")
+        logger.error("fcm_send_error", error=str(e))
         return False
 
 
@@ -199,7 +192,7 @@ async def send_push_notification(
         return success
 
     except Exception as e:
-        logger.error(f"Failed to send notification to {user_id}: {e}")
+        logger.error("notification_send_failed", user_id=user_id, error=str(e))
         return False
 
 
