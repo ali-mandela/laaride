@@ -1,0 +1,52 @@
+name: LaaRide CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install ruff
+        run: uv add ruff
+      - name: Run linting
+        run: uv run ruff check app/
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Install dependencies
+        run: uv sync --dev
+      - name: Run tests
+        env:
+          MONGODB_URL: mongodb://localhost:27017/test_laaride
+          DATABASE_NAME: test_laaride
+          SECRET_KEY: test-secret-key
+          IS_DEVELOPMENT: "true"
+        run: uv run pytest tests/ -v
+
+  build:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t laaride-api:latest .

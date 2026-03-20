@@ -66,3 +66,10 @@ class BookingDocument(MongoBaseDocument):
     cancelled_by: Optional[str] = Field(None, description="User ID who cancelled")
     confirmed_at: Optional[datetime] = Field(None, description="When booking was confirmed")
     completed_at: Optional[datetime] = Field(None, description="When booking was completed")
+
+    # Payment
+    payment_status: PaymentStatus = Field(
+        default=PaymentStatus.UNPAID, description="Payment status"
+    )
+    payment_method: Optional[PaymentMethod] = Field(None, description="Payment method")
+    payment_id: Optional[str] = Field(None, description="Reference to PaymentDocument")

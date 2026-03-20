@@ -23,6 +23,7 @@ from app.core.database import (
     ROUTES_COLLECTION,
     BOOKINGS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
+    PAYMENTS_COLLECTION,
 )
 from app.core.exceptions import LaaRideException
 from app.core.logging import setup_logging, get_logger
@@ -94,6 +95,11 @@ async def lifespan(app: FastAPI):
     await db_instance.db[ROUTES_COLLECTION].create_index([("destination.name", 1), ("is_active", 1)])
     await db_instance.db[DRIVERS_COLLECTION].create_index([("status", 1), ("availability", 1)])
     await db_instance.db[VEHICLES_COLLECTION].create_index([("driver_id", 1), ("is_active", 1)])
+    # Payment indexes
+    await db_instance.db[PAYMENTS_COLLECTION].create_index("razorpay_order_id", unique=True, sparse=True)
+    await db_instance.db[PAYMENTS_COLLECTION].create_index("booking_id")
+    await db_instance.db[PAYMENTS_COLLECTION].create_index("passenger_id")
+    await db_instance.db[PAYMENTS_COLLECTION].create_index("payment_status")
 
     logger.info("indexes_created")
 
