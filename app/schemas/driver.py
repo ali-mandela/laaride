@@ -7,23 +7,31 @@ from app.enums.common import AvailabilityStatus, DriverStatus
 
 
 class DriverCreate(BaseModel):
-    """Schema for creating a new driver profile."""
+    """Schema for applying as a driver. user_id comes from auth token."""
 
-    user_id: str = Field(..., description="Reference to existing User")
     license_number: str = Field(..., description="Driver's license number")
     license_expiry: date = Field(..., description="License expiry date")
 
 
 class DriverUpdate(BaseModel):
-    """Schema for updating driver profile."""
+    """Schema for updating driver profile (driver-editable fields only)."""
 
     license_expiry: Optional[date] = Field(None, description="License expiry date")
-    availability: Optional[AvailabilityStatus] = Field(
-        None, description="Current availability"
-    )
     current_location: Optional[dict] = Field(
         None, description="Current location with lat and lng"
     )
+
+
+class AvailabilityToggle(BaseModel):
+    """Schema for toggling driver availability."""
+
+    availability: AvailabilityStatus = Field(..., description="New availability status")
+
+
+class SuspendRequest(BaseModel):
+    """Schema for admin suspending a driver."""
+
+    reason: str = Field(..., description="Reason for suspension")
 
 
 class DriverResponse(BaseModel):

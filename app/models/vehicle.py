@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import Field
 
 from app.enums.common import VehicleType
@@ -17,3 +19,6 @@ class VehicleDocument(MongoBaseDocument):
     )
     capacity: int = Field(..., description="Passenger capacity")
     is_active: bool = Field(default=True, description="Whether the vehicle is active")
+    seat_layout: Optional[dict] = Field(
+        None, description="Seat layout with rows, columns, unavailable_seats"
+    )

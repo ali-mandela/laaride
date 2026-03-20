@@ -7,9 +7,8 @@ from app.enums.common import VehicleType
 
 
 class VehicleCreate(BaseModel):
-    """Schema for registering a new vehicle."""
+    """Schema for registering a new vehicle. driver_id comes from driver lookup."""
 
-    driver_id: str = Field(..., description="Reference to Driver")
     vehicle_type: VehicleType = Field(..., description="Type of vehicle")
     make: str = Field(..., description="Vehicle make (e.g. Innova)")
     model: str = Field(..., description="Vehicle model")
@@ -18,6 +17,10 @@ class VehicleCreate(BaseModel):
         ..., description="Unique registration number"
     )
     capacity: int = Field(..., description="Passenger capacity")
+    seat_layout: Optional[dict] = Field(
+        None,
+        description="Seat layout with rows, columns, unavailable_seats. Auto-generated if not provided.",
+    )
 
 
 class VehicleUpdate(BaseModel):
@@ -25,6 +28,7 @@ class VehicleUpdate(BaseModel):
 
     is_active: Optional[bool] = Field(None, description="Whether the vehicle is active")
     capacity: Optional[int] = Field(None, description="Passenger capacity")
+    seat_layout: Optional[dict] = Field(None, description="Updated seat layout")
 
 
 class VehicleResponse(BaseModel):
@@ -39,6 +43,7 @@ class VehicleResponse(BaseModel):
     registration_number: str
     capacity: int
     is_active: bool
+    seat_layout: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
 

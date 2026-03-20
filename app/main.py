@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.core.config import settings
-from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION
+from app.core.database import db_instance, USERS_COLLECTION, OTP_COLLECTION, DRIVERS_COLLECTION, VEHICLES_COLLECTION
 from app.routes.v1 import v1_router
 
 
@@ -27,6 +27,12 @@ async def lifespan(app: FastAPI):
     await db_instance.db[OTP_COLLECTION].create_index([("phone", 1), ("expires_at", 1)])
     # TTL index to auto-delete expired OTPs
     await db_instance.db[OTP_COLLECTION].create_index("expires_at", expireAfterSeconds=0)
+    # Driver: unique user_id
+    await db_instance.db[DRIVERS_COLLECTION].create_index("user_id", unique=True)
+    # Vehicle: unique registration_number
+    await db_instance.db[VEHICLES_COLLECTION].create_index("registration_number", unique=True)
+    # Vehicle: index on driver_id for lookup
+    await db_instance.db[VEHICLES_COLLECTION].create_index("driver_id")
 
     yield
 
