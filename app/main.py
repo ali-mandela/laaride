@@ -26,6 +26,7 @@ from app.core.database import (
     PAYMENTS_COLLECTION,
 )
 from app.core.exceptions import LaaRideException
+from app.core.firebase import setup_firebase
 from app.core.logging import setup_logging, get_logger
 from app.middleware import RequestIDMiddleware, get_request_id
 from app.middleware.logging import LoggingMiddleware
@@ -119,8 +120,22 @@ async def lifespan(app: FastAPI):
     await db_instance.db[PAYMENTS_COLLECTION].create_index("booking_id")
     await db_instance.db[PAYMENTS_COLLECTION].create_index("passenger_id")
     await db_instance.db[PAYMENTS_COLLECTION].create_index("payment_status")
+    # Reviews, earnings, disputes indexes
+    await db_instance.db["reviews"].create_index("booking_id", unique=True)
+    await db_instance.db["reviews"].create_index("driver_id")
+    await db_instance.db["reviews"].create_index([("driver_id", 1), ("is_visible", 1)])
+    await db_instance.db["earnings"].create_index("driver_id")
+    await db_instance.db["earnings"].create_index([("driver_id", 1), ("trip_date", -1)])
+    await db_instance.db["earnings"].create_index([("driver_id", 1), ("status", 1)])
+    await db_instance.db["disputes"].create_index([("booking_id", 1), ("status", 1)])
+    await db_instance.db["disputes"].create_index("raised_by")
+    await db_instance.db["disputes"].create_index("status")
+    await db_instance.db["dispute_messages"].create_index("dispute_id")
 
     logger.info("indexes_created")
+
+    # Initialise Firebase (graceful — no-op if credentials absent)
+    setup_firebase(settings.FIREBASE_PROJECT_ID, settings.FIREBASE_SERVICE_ACCOUNT_KEY)
 
     yield
 

@@ -1,9 +1,8 @@
-"""Firebase Cloud Messaging (FCM) service for push notifications.
+"""Firebase Cloud Messaging (FCM) service via Firebase Admin SDK.
 
-This module implements the actual FCM push notification delivery
-using the Firebase Admin SDK.
-
-TODO: Replace all placeholder implementations with real Firebase Admin SDK calls.
+Requires: firebase-admin (added to pyproject.toml dependencies).
+Set FIREBASE_PROJECT_ID and FIREBASE_SERVICE_ACCOUNT_KEY in .env to enable.
+When not configured, all calls degrade gracefully (return False / empty counts).
 """
 from __future__ import annotations
 
@@ -13,32 +12,34 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# TODO: Install firebase-admin: uv add firebase-admin
-# import firebase_admin
-# from firebase_admin import credentials, messaging
-
-_firebase_app = None
+_firebase_app = None  # module-level singleton
 
 
 def initialize_firebase(service_account_key: str | dict, project_id: str) -> None:
-    """Initialize Firebase Admin SDK.
+    """Initialise Firebase Admin SDK once at application startup."""
+    global _firebase_app
+    if _firebase_app is not None:
+        return  # already initialised
 
-    Args:
-        service_account_key: Path to JSON key file or JSON string of service account credentials.
-        project_id: Firebase project ID.
-    """
-    # TODO: Implement
-    # global _firebase_app
-    # if isinstance(service_account_key, str):
-    #     try:
-    #         cred_dict = json.loads(service_account_key)
-    #     except json.JSONDecodeError:
-    #         cred_dict = service_account_key  # treat as file path
-    # else:
-    #     cred_dict = service_account_key
-    # cred = credentials.Certificate(cred_dict)
-    # _firebase_app = firebase_admin.initialize_app(cred, {"projectId": project_id})
-    logger.info("Firebase initialized (stub)", extra={"project_id": project_id})
+    import firebase_admin
+    from firebase_admin import credentials
+
+    if isinstance(service_account_key, str):
+        try:
+            cred_dict = json.loads(service_account_key)
+        except json.JSONDecodeError:
+            # Treat as file path
+            cred_dict = service_account_key  # type: ignore[assignment]
+    else:
+        cred_dict = service_account_key
+
+    cred = credentials.Certificate(cred_dict)
+    _firebase_app = firebase_admin.initialize_app(cred, {"projectId": project_id})
+    logger.info("firebase_admin_initialised", project_id=project_id)
+
+
+def _is_ready() -> bool:
+    return _firebase_app is not None
 
 
 async def send_push_notification(
@@ -50,43 +51,41 @@ async def send_push_notification(
 ) -> bool:
     """Send a push notification to a single FCM token.
 
-    Args:
-        token: FCM device registration token.
-        title: Notification title.
-        body: Notification body text.
-        data: Optional key-value data payload.
-        image_url: Optional image URL for rich notifications.
-
-    Returns:
-        True if successfully sent, False otherwise.
+    Returns True on success, False on failure (invalid token, SDK not initialised, etc.).
     """
-    # TODO: Implement with firebase_admin.messaging
-    # message = messaging.Message(
-    #     notification=messaging.Notification(title=title, body=body, image=image_url),
-    #     data={str(k): str(v) for k, v in (data or {}).items()},
-    #     token=token,
-    #     android=messaging.AndroidConfig(
-    #         priority="high",
-    #         notification=messaging.AndroidNotification(sound="default"),
-    #     ),
-    #     apns=messaging.APNSConfig(
-    #         payload=messaging.APNSPayload(
-    #             aps=messaging.Aps(sound="default", badge=1)
-    #         )
-    #     ),
-    # )
-    # try:
-    #     response = messaging.send(message)
-    #     logger.info("FCM message sent", extra={"message_id": response})
-    #     return True
-    # except messaging.UnregisteredError:
-    #     logger.warning("FCM token unregistered", extra={"token": token[:20]})
-    #     return False
-    # except Exception as e:
-    #     logger.error("FCM send error", extra={"error": str(e)})
-    #     return False
-    logger.info("FCM push sent (stub)", extra={"title": title, "token_prefix": token[:10]})
-    return True
+    if not _is_ready():
+        logger.debug("fcm_not_initialised_skipping")
+        return False
+
+    from firebase_admin import messaging
+
+    message = messaging.Message(
+        notification=messaging.Notification(title=title, body=body, image=image_url),
+        data={str(k): str(v) for k, v in (data or {}).items()},
+        token=token,
+        android=messaging.AndroidConfig(
+            priority="high",
+            notification=messaging.AndroidNotification(sound="default"),
+        ),
+        apns=messaging.APNSConfig(
+            payload=messaging.APNSPayload(
+                aps=messaging.Aps(sound="default", badge=1)
+            )
+        ),
+    )
+    try:
+        response = messaging.send(message)
+        logger.info("fcm_sent", message_id=response, token_prefix=token[:12])
+        return True
+    except messaging.UnregisteredError:
+        logger.warning("fcm_token_unregistered", token_prefix=token[:12])
+        return False
+    except messaging.SenderIdMismatchError:
+        logger.warning("fcm_sender_mismatch", token_prefix=token[:12])
+        return False
+    except Exception as exc:
+        logger.error("fcm_send_error", error=str(exc))
+        return False
 
 
 async def send_multicast_notification(
@@ -95,37 +94,52 @@ async def send_multicast_notification(
     body: str,
     data: dict[str, Any] | None = None,
 ) -> dict[str, int]:
-    """Send push notification to multiple FCM tokens.
+    """Send push to multiple tokens. Returns success_count + failure_count."""
+    if not _is_ready() or not tokens:
+        return {"success_count": 0, "failure_count": len(tokens)}
 
-    Args:
-        tokens: List of FCM device registration tokens.
-        title: Notification title.
-        body: Notification body.
-        data: Optional data payload.
+    from firebase_admin import messaging
 
-    Returns:
-        Dict with 'success_count' and 'failure_count'.
-    """
-    # TODO: Implement with messaging.MulticastMessage
-    # message = messaging.MulticastMessage(
-    #     notification=messaging.Notification(title=title, body=body),
-    #     data={str(k): str(v) for k, v in (data or {}).items()},
-    #     tokens=tokens,
-    # )
-    # response = messaging.send_each_for_multicast(message)
-    # return {"success_count": response.success_count, "failure_count": response.failure_count}
-    logger.info("FCM multicast sent (stub)", extra={"token_count": len(tokens)})
-    return {"success_count": len(tokens), "failure_count": 0}
+    message = messaging.MulticastMessage(
+        notification=messaging.Notification(title=title, body=body),
+        data={str(k): str(v) for k, v in (data or {}).items()},
+        tokens=tokens,
+        android=messaging.AndroidConfig(priority="high"),
+    )
+    try:
+        response = messaging.send_each_for_multicast(message)
+        logger.info(
+            "fcm_multicast_sent",
+            success=response.success_count,
+            failure=response.failure_count,
+        )
+        return {
+            "success_count": response.success_count,
+            "failure_count": response.failure_count,
+        }
+    except Exception as exc:
+        logger.error("fcm_multicast_error", error=str(exc))
+        return {"success_count": 0, "failure_count": len(tokens)}
 
 
 async def unregister_invalid_tokens(tokens: list[str]) -> list[str]:
-    """Check which tokens are invalid/unregistered and return valid ones.
+    """Return only tokens that are still registered (dry-run send to validate)."""
+    if not _is_ready() or not tokens:
+        return tokens
 
-    Args:
-        tokens: List of FCM tokens to validate.
+    from firebase_admin import messaging
 
-    Returns:
-        List of still-valid tokens.
-    """
-    # TODO: Use dry_run send to validate tokens
-    return tokens
+    valid: list[str] = []
+    for token in tokens:
+        msg = messaging.Message(
+            data={"_validate": "1"},
+            token=token,
+        )
+        try:
+            messaging.send(msg, dry_run=True)
+            valid.append(token)
+        except messaging.UnregisteredError:
+            logger.info("fcm_pruned_invalid_token", token_prefix=token[:12])
+        except Exception:
+            valid.append(token)  # keep on unknown errors
+    return valid
