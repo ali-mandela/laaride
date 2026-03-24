@@ -1,8 +1,6 @@
 """Route service — all business logic for the routes module."""
 
-import os
 import re
-import time
 from datetime import datetime
 from typing import Any, Optional
 
@@ -11,13 +9,8 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.core.database import BOOKINGS_COLLECTION, ROUTES_COLLECTION
 from app.schemas.route import RouteCreate, RouteResponse, RouteSearchParams, RouteUpdate
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
-MAX_THUMBNAIL_SIZE_BYTES = 3 * 1024 * 1024  # 3 MB
-UPLOAD_DIR = os.path.join("uploads", "routes")
+from app.services.osrm_service import get_route_info
+from app.services.storage_service import get_storage_service
 
 
 def _to_object_id(value: str, label: str = "ID") -> ObjectId:
@@ -68,14 +61,34 @@ async def create_route(data: RouteCreate, db: Any) -> RouteResponse:
     # Sort waypoints by order if provided
     waypoints = sorted(data.waypoints, key=lambda w: w.get("order", 0)) if data.waypoints else []
 
+    # Auto-calculate distance and duration via OSRM if coords are available
+    distance_km = data.distance_km
+    duration_mins = data.estimated_duration_mins
+    origin = data.origin
+    destination = data.destination
+    if (
+        origin.get("lat") and origin.get("lng")
+        and destination.get("lat") and destination.get("lng")
+    ):
+        osrm = get_route_info(
+            origin_lat=origin["lat"], origin_lng=origin["lng"],
+            dest_lat=destination["lat"], dest_lng=destination["lng"],
+        )
+        if osrm:
+            # Only override if not explicitly provided by the admin
+            if distance_km is None:
+                distance_km = osrm.distance_km
+            if duration_mins is None:
+                duration_mins = osrm.duration_minutes
+
     now = datetime.utcnow()
     route_doc = {
         "name": data.name,
         "slug": slug,
-        "origin": data.origin,
-        "destination": data.destination,
-        "distance_km": data.distance_km,
-        "estimated_duration_mins": data.estimated_duration_mins,
+        "origin": origin,
+        "destination": destination,
+        "distance_km": distance_km,
+        "estimated_duration_mins": duration_mins,
         "base_fare": data.base_fare,
         "is_active": True,
         "waypoints": waypoints,
@@ -235,7 +248,7 @@ async def delete_route(route_id: str, db: Any) -> dict:
 async def upload_route_thumbnail(
     route_id: str, file: UploadFile, db: Any
 ) -> RouteResponse:
-    """Validate image file, save, and update thumbnail_url on the route."""
+    """Upload a thumbnail image and update thumbnail_url on the route."""
     obj_id = _to_object_id(route_id, "Route ID")
 
     route = await db[ROUTES_COLLECTION].find_one({"_id": obj_id})
@@ -244,39 +257,12 @@ async def upload_route_thumbnail(
             status_code=status.HTTP_404_NOT_FOUND, detail="Route not found"
         )
 
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required"
-        )
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{ext}'. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
-        )
-
-    contents = await file.read()
-    if len(contents) > MAX_THUMBNAIL_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size is {MAX_THUMBNAIL_SIZE_BYTES // (1024 * 1024)}MB",
-        )
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    timestamp = int(time.time())
-    filename = f"{route_id}_{timestamp}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    relative_path = f"/uploads/routes/{filename}"
+    storage = get_storage_service()
+    thumbnail_url = await storage.upload_file(file, "routes", file.filename or "thumbnail")
 
     await db[ROUTES_COLLECTION].update_one(
         {"_id": obj_id},
-        {"$set": {"thumbnail_url": relative_path, "updated_at": datetime.utcnow()}},
+        {"$set": {"thumbnail_url": thumbnail_url, "updated_at": datetime.utcnow()}},
     )
 
     updated = await db[ROUTES_COLLECTION].find_one({"_id": obj_id})

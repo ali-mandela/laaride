@@ -1,5 +1,3 @@
-import os
-import time
 from datetime import datetime
 from typing import Any, Optional
 
@@ -10,11 +8,7 @@ from app.core.database import USERS_COLLECTION, BOOKINGS_COLLECTION
 from app.enums.common import UserRole
 from app.schemas.booking import BookingResponse
 from app.schemas.user import UserResponse, UserUpdate
-
-
-ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
-MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024  # 2 MB
-UPLOAD_DIR = os.path.join("uploads", "profiles")
+from app.services.storage_service import get_storage_service
 
 
 async def get_user_by_id(user_id: str, db: Any) -> UserResponse:
@@ -66,42 +60,9 @@ async def update_user(user_id: str, data: UserUpdate, db: Any) -> UserResponse:
 async def upload_profile_photo(
     user_id: str, file: UploadFile, db: Any
 ) -> UserResponse:
-    """Validate, save, and attach a profile photo to the user."""
-    # Validate extension
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename is required",
-        )
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{ext}'. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
-        )
-
-    # Read file and validate size
-    contents = await file.read()
-    if len(contents) > MAX_FILE_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE_BYTES // (1024 * 1024)}MB",
-        )
-
-    # Ensure upload directory exists
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    # Save file
-    timestamp = int(time.time())
-    filename = f"{user_id}_{timestamp}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    # Store relative path in DB (served via /uploads static mount)
-    relative_path = f"/uploads/profiles/{filename}"
+    """Validate, upload, and attach a profile photo to the user."""
+    storage = get_storage_service()
+    photo_url = await storage.upload_file(file, "profiles", file.filename or "photo")
 
     try:
         obj_id = ObjectId(user_id) if isinstance(user_id, str) else user_id
@@ -110,11 +71,11 @@ async def upload_profile_photo(
 
     result = await db[USERS_COLLECTION].update_one(
         {"_id": obj_id},
-        {"$set": {"profile_photo": relative_path, "updated_at": datetime.utcnow()}},
+        {"$set": {"profile_photo": photo_url, "updated_at": datetime.utcnow()}},
     )
     if result.matched_count == 0:
-        # Clean up the file if user doesn't exist
-        os.remove(filepath)
+        # Try to clean up the uploaded file
+        await storage.delete_file(photo_url)
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
