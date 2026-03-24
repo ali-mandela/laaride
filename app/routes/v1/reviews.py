@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_database
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_role
+from app.enums.common import UserRole
 from app.schemas.review import ReviewCreate, ReviewResponse, DriverRatingSummary
 from app.services import review_service
 
@@ -40,3 +41,14 @@ async def driver_rating_summary(
 ):
     """Get aggregate rating stats and breakdown for a driver."""
     return await review_service.get_driver_rating_summary(db, driver_id)
+
+
+@router.delete("/{review_id}/flag")
+async def flag_review(
+    review_id: str,
+    current_user=Depends(require_role(UserRole.ADMIN)),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Admin: flag and hide a review."""
+    await review_service.flag_review(db, review_id, str(current_user.id))
+    return {"status": "flagged"}
