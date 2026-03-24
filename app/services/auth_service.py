@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.core.database import USERS_COLLECTION, OTP_COLLECTION
 from app.core.exceptions import AuthenticationError, ValidationError, NotFoundError
 from app.core.logging import get_logger
+from app.services.sms_service import send_otp_sms
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -54,9 +55,11 @@ async def send_otp(phone: str, db: Any) -> SendOTPResponse:
     )
     await db[OTP_COLLECTION].insert_one(otp_doc.model_dump(by_alias=True, exclude_none=True))
 
-    logger.info("otp_sent", phone=_mask_phone(phone))
+    # Attempt SMS delivery via Fast2SMS
+    sms_delivered = send_otp_sms(phone, otp_code)
+    logger.info("otp_generated", phone=_mask_phone(phone), sms_delivered=sms_delivered)
 
-    message = f"OTP sent to {phone}"
+    message = "OTP sent" if sms_delivered else "OTP generated (SMS unavailable in this environment)"
     return SendOTPResponse(
         message=message,
         otp=otp_code if settings.IS_DEVELOPMENT else None

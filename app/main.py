@@ -30,6 +30,7 @@ from app.core.logging import setup_logging, get_logger
 from app.middleware import RequestIDMiddleware, get_request_id
 from app.middleware.logging import LoggingMiddleware
 from app.routes.v1 import v1_router
+from app.routes.v1.default import router as default_router
 
 logger = get_logger("laaride.main")
 
@@ -40,12 +41,30 @@ def _get_limiter_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-limiter = Limiter(
-    key_func=_get_limiter_key,
-    default_limits=["30/minute"],
-    enabled=settings.RATE_LIMIT_ENABLED,
-    storage_uri=settings.REDIS_URL if settings.REDIS_URL else "memory://",
-)
+def _build_limiter() -> Limiter:
+    """Build rate limiter — tries Redis (Upstash), falls back to in-memory."""
+    if settings.REDIS_URL and settings.RATE_LIMIT_ENABLED:
+        try:
+            return Limiter(
+                key_func=_get_limiter_key,
+                default_limits=["30/minute"],
+                enabled=True,
+                storage_uri=settings.REDIS_URL,
+            )
+        except Exception as e:
+            logger.warning(
+                "Redis unavailable for rate limiting, falling back to memory",
+                error=str(e),
+            )
+    return Limiter(
+        key_func=_get_limiter_key,
+        default_limits=["30/minute"],
+        enabled=settings.RATE_LIMIT_ENABLED,
+        storage_uri="memory://",
+    )
+
+
+limiter = _build_limiter()
 
 
 # ── Upload dirs ────────────────────────────────────────────────────────────
@@ -244,4 +263,5 @@ app.add_middleware(LoggingMiddleware)
 # ── Static files & routes ──────────────────────────────────────────────────
 
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.include_router(default_router) # Root level info and health
 app.include_router(v1_router)
