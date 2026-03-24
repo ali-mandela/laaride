@@ -21,6 +21,7 @@ from app.enums.common import (
     VehicleType,
 )
 from app.schemas.route import RouteResponse
+from app.services.osrm_service import get_route_info
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,26 @@ WEATHER_ADVISORIES = {
 }
 
 
+def _enrich_with_osrm(route: dict) -> dict:
+    """If a route is missing distance/duration, fetch them from OSRM."""
+    if route.get("distance_km") and route.get("estimated_duration_mins"):
+        return route  # already complete
+
+    origin = route.get("origin") or {}
+    dest = route.get("destination") or {}
+    if origin.get("lat") and origin.get("lng") and dest.get("lat") and dest.get("lng"):
+        info = get_route_info(
+            origin_lat=origin["lat"], origin_lng=origin["lng"],
+            dest_lat=dest["lat"], dest_lng=dest["lng"],
+        )
+        if info:
+            if not route.get("distance_km"):
+                route["distance_km"] = info.distance_km
+            if not route.get("estimated_duration_mins"):
+                route["estimated_duration_mins"] = info.duration_minutes
+    return route
+
+
 # ── 1. Search Routes ──────────────────────────────────────────────────────
 
 
@@ -90,6 +111,7 @@ async def search_routes(query: str, db: Any) -> list[dict]:
         async for doc in text_cursor:
             route = RouteResponse(**doc).model_dump()
             route["_id"] = str(doc["_id"])
+            route = _enrich_with_osrm(route)
             # Add seasonal warning
             if doc.get("is_seasonal"):
                 s_start = doc.get("season_start_month", 1)
@@ -119,6 +141,7 @@ async def search_routes(query: str, db: Any) -> list[dict]:
     async for doc in cursor:
         route = RouteResponse(**doc).model_dump()
         route["_id"] = str(doc["_id"])
+        route = _enrich_with_osrm(route)
         if doc.get("is_seasonal"):
             s_start = doc.get("season_start_month", 1)
             s_end = doc.get("season_end_month", 12)

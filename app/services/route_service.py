@@ -9,6 +9,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.core.database import BOOKINGS_COLLECTION, ROUTES_COLLECTION
 from app.schemas.route import RouteCreate, RouteResponse, RouteSearchParams, RouteUpdate
+from app.services.osrm_service import get_route_info
 from app.services.storage_service import get_storage_service
 
 
@@ -60,14 +61,34 @@ async def create_route(data: RouteCreate, db: Any) -> RouteResponse:
     # Sort waypoints by order if provided
     waypoints = sorted(data.waypoints, key=lambda w: w.get("order", 0)) if data.waypoints else []
 
+    # Auto-calculate distance and duration via OSRM if coords are available
+    distance_km = data.distance_km
+    duration_mins = data.estimated_duration_mins
+    origin = data.origin
+    destination = data.destination
+    if (
+        origin.get("lat") and origin.get("lng")
+        and destination.get("lat") and destination.get("lng")
+    ):
+        osrm = get_route_info(
+            origin_lat=origin["lat"], origin_lng=origin["lng"],
+            dest_lat=destination["lat"], dest_lng=destination["lng"],
+        )
+        if osrm:
+            # Only override if not explicitly provided by the admin
+            if distance_km is None:
+                distance_km = osrm.distance_km
+            if duration_mins is None:
+                duration_mins = osrm.duration_minutes
+
     now = datetime.utcnow()
     route_doc = {
         "name": data.name,
         "slug": slug,
-        "origin": data.origin,
-        "destination": data.destination,
-        "distance_km": data.distance_km,
-        "estimated_duration_mins": data.estimated_duration_mins,
+        "origin": origin,
+        "destination": destination,
+        "distance_km": distance_km,
+        "estimated_duration_mins": duration_mins,
         "base_fare": data.base_fare,
         "is_active": True,
         "waypoints": waypoints,
