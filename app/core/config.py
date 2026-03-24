@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: Optional[str] = None
     RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
 
+    # Backblaze B2 (S3-compatible storage)
+    BACKBLAZE_KEY_ID: Optional[str] = None
+    BACKBLAZE_APPLICATION_KEY: Optional[str] = None
+    BACKBLAZE_BUCKET_NAME: Optional[str] = None
+    BACKBLAZE_REGION: str = "us-west-004"
+
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
     )
