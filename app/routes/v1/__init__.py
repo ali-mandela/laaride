@@ -12,6 +12,7 @@ from .search import router as search_router
 from .payments import router as payments_router
 from .tracking import router as tracking_router
 from .reviews import router as reviews_router
+from .earnings import router as earnings_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -27,3 +28,4 @@ v1_router.include_router(search_router, prefix="/search")
 v1_router.include_router(payments_router)
 v1_router.include_router(tracking_router)
 v1_router.include_router(reviews_router, prefix="/reviews")
+v1_router.include_router(earnings_router, prefix="/earnings")
