@@ -1,8 +1,6 @@
 """Route service — all business logic for the routes module."""
 
-import os
 import re
-import time
 from datetime import datetime
 from typing import Any, Optional
 
@@ -11,13 +9,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from app.core.database import BOOKINGS_COLLECTION, ROUTES_COLLECTION
 from app.schemas.route import RouteCreate, RouteResponse, RouteSearchParams, RouteUpdate
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────
-
-ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
-MAX_THUMBNAIL_SIZE_BYTES = 3 * 1024 * 1024  # 3 MB
-UPLOAD_DIR = os.path.join("uploads", "routes")
+from app.services.storage_service import get_storage_service
 
 
 def _to_object_id(value: str, label: str = "ID") -> ObjectId:
@@ -235,7 +227,7 @@ async def delete_route(route_id: str, db: Any) -> dict:
 async def upload_route_thumbnail(
     route_id: str, file: UploadFile, db: Any
 ) -> RouteResponse:
-    """Validate image file, save, and update thumbnail_url on the route."""
+    """Upload a thumbnail image and update thumbnail_url on the route."""
     obj_id = _to_object_id(route_id, "Route ID")
 
     route = await db[ROUTES_COLLECTION].find_one({"_id": obj_id})
@@ -244,39 +236,12 @@ async def upload_route_thumbnail(
             status_code=status.HTTP_404_NOT_FOUND, detail="Route not found"
         )
 
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required"
-        )
-
-    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
-    if ext not in ALLOWED_IMAGE_EXTENSIONS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{ext}'. Allowed: {', '.join(ALLOWED_IMAGE_EXTENSIONS)}",
-        )
-
-    contents = await file.read()
-    if len(contents) > MAX_THUMBNAIL_SIZE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"File too large. Maximum size is {MAX_THUMBNAIL_SIZE_BYTES // (1024 * 1024)}MB",
-        )
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-    timestamp = int(time.time())
-    filename = f"{route_id}_{timestamp}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(contents)
-
-    relative_path = f"/uploads/routes/{filename}"
+    storage = get_storage_service()
+    thumbnail_url = await storage.upload_file(file, "routes", file.filename or "thumbnail")
 
     await db[ROUTES_COLLECTION].update_one(
         {"_id": obj_id},
-        {"$set": {"thumbnail_url": relative_path, "updated_at": datetime.utcnow()}},
+        {"$set": {"thumbnail_url": thumbnail_url, "updated_at": datetime.utcnow()}},
     )
 
     updated = await db[ROUTES_COLLECTION].find_one({"_id": obj_id})
