@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: Optional[str] = None
     RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
 
+    # Fast2SMS — Indian OTP delivery (https://fast2sms.com)
+    FAST2SMS_API_KEY: Optional[str] = None
+
     # Backblaze B2 (S3-compatible storage)
     BACKBLAZE_KEY_ID: Optional[str] = None
     BACKBLAZE_APPLICATION_KEY: Optional[str] = None
