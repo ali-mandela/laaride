@@ -76,61 +76,10 @@ async def remove_fcm_token(user_id: str, token: str, db: Any) -> dict:
 
 
 async def _send_fcm_message(token: str, title: str, body: str, data: Optional[dict]) -> bool:
-    """Send a single FCM push via HTTP v1 API. Returns True on success."""
-    project_id = settings.FIREBASE_PROJECT_ID
-    service_account_key = settings.FIREBASE_SERVICE_ACCOUNT_KEY
+    """Send a single FCM push via Firebase Admin SDK. Returns True on success."""
+    from app.services.fcm_service import send_push_notification as _sdk_send
 
-    if not project_id or not service_account_key:
-        logger.info("FCM not configured — skipping push notification (dev mode)")
-        return False
-
-    try:
-        import google.auth.transport.requests
-        from google.oauth2 import service_account
-
-        # Parse service account key
-        sa_info = json.loads(service_account_key)
-        credentials = service_account.Credentials.from_service_account_info(
-            sa_info,
-            scopes=["https://www.googleapis.com/auth/firebase.messaging"],
-        )
-        credentials.refresh(google.auth.transport.requests.Request())
-
-        import httpx
-
-        url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
-        headers = {
-            "Authorization": f"Bearer {credentials.token}",
-            "Content-Type": "application/json",
-        }
-        message = {
-            "message": {
-                "token": token,
-                "notification": {"title": title, "body": body},
-            }
-        }
-        if data:
-            message["message"]["data"] = {k: str(v) for k, v in data.items()}
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(url, json=message, headers=headers, timeout=10)
-
-        if resp.status_code == 200:
-            return True
-        elif resp.status_code in (400, 404):
-            # Invalid token — should be removed
-            logger.warning("invalid_fcm_token", token_prefix=token[:20])
-            return False
-        else:
-            logger.error("fcm_send_failed", status_code=resp.status_code)
-            return False
-
-    except ImportError:
-        logger.info("fcm_not_installed")
-        return False
-    except Exception as e:
-        logger.error("fcm_send_error", error=str(e))
-        return False
+    return await _sdk_send(token=token, title=title, body=body, data=data)
 
 
 # ── Send Notification ──────────────────────────────────────────────────────
