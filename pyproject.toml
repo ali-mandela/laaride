@@ -18,6 +18,8 @@ dependencies = [
     "structlog>=25.5.0",
     "slowapi>=0.1.9",
     "razorpay>=2.0.1",
+    "boto3>=1.42.73",
+    "redis>=7.3.0",
 ]
 
 [dependency-groups]

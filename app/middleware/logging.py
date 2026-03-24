@@ -10,8 +10,8 @@ from app.middleware import get_request_id
 
 logger = get_logger("laaride.http")
 
-# Paths to skip logging
-SKIP_PATHS = {"/", "/health", "/api/v1/", "/api/v1/health"}
+# Paths to skip logging (e.g. for production heartbeats)
+SKIP_PATHS = set()
 
 SLOW_REQUEST_THRESHOLD_MS = 1000
 
@@ -29,7 +29,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
 
         log_data = {
-            "event": "request",
             "method": request.method,
             "path": path,
             "status": response.status_code,
