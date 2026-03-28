@@ -10,6 +10,11 @@ BOOKINGS_COLLECTION = "bookings"
 PAYMENTS_COLLECTION = "payments"
 OTP_COLLECTION = "otps"
 NOTIFICATIONS_COLLECTION = "notifications"
+TRIPS_COLLECTION = "trips"
+REVIEWS_COLLECTION = "reviews"
+EARNINGS_COLLECTION = "earnings"
+DISPUTES_COLLECTION = "disputes"
+DISPUTE_MESSAGES_COLLECTION = "dispute_messages"
 
 
 class Database:

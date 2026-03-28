@@ -77,3 +77,28 @@ async def popular_origins(
 ):
     """Top origin cities ranked by booking count."""
     return await search_service.get_popular_origins(db)
+
+
+@router.get("/trips", summary="Search trips (passenger-facing)")
+async def search_trips(
+    origin: Optional[str] = Query(default=None, description="Origin city name"),
+    destination: Optional[str] = Query(default=None, description="Destination city name"),
+    date: Optional[date] = Query(default=None, description="Travel date (YYYY-MM-DD)"),
+    seats: Optional[int] = Query(default=None, ge=1, description="Minimum seats required"),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Any = Depends(get_database),
+):
+    """
+    Primary passenger search — returns driver-listed trips matching filters.
+    Results include driver info, vehicle info, available seats, and fare per seat.
+    """
+    return await search_service.search_trips_for_passengers(
+        db,
+        origin=origin,
+        destination=destination,
+        trip_date=date,
+        seats=seats,
+        skip=skip,
+        limit=limit,
+    )

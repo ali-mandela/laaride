@@ -24,6 +24,7 @@ from app.core.database import (
     BOOKINGS_COLLECTION,
     NOTIFICATIONS_COLLECTION,
     PAYMENTS_COLLECTION,
+    TRIPS_COLLECTION,
 )
 from app.core.exceptions import LaaRideException
 from app.core.firebase import setup_firebase
@@ -131,6 +132,12 @@ async def lifespan(app: FastAPI):
     await db_instance.db["disputes"].create_index("raised_by")
     await db_instance.db["disputes"].create_index("status")
     await db_instance.db["dispute_messages"].create_index("dispute_id")
+    # Trip indexes
+    await db_instance.db[TRIPS_COLLECTION].create_index("driver_id")
+    await db_instance.db[TRIPS_COLLECTION].create_index([("driver_id", 1), ("trip_date", -1)])
+    await db_instance.db[TRIPS_COLLECTION].create_index([("origin.name", 1), ("destination.name", 1), ("trip_date", 1)])
+    await db_instance.db[TRIPS_COLLECTION].create_index([("status", 1), ("trip_date", 1)])
+    await db_instance.db[TRIPS_COLLECTION].create_index("route_id")
 
     logger.info("indexes_created")
 

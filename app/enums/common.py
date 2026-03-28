@@ -53,3 +53,10 @@ class PaymentMethod(str, Enum):
     ONLINE = "online"
     CASH = "cash"
 
+
+class TripStatus(str, Enum):
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+

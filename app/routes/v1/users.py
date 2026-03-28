@@ -1,13 +1,18 @@
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from pydantic import BaseModel
 
 from app.core.database import get_database
 from app.core.security import get_current_active_user, get_current_admin
 from app.enums.common import UserRole
 from app.models.user import UserDocument
 from app.schemas.user import UserResponse, UserUpdate
-from app.services import user_service
+from app.services import notification_service, user_service
+
+
+class FcmTokenRequest(BaseModel):
+    token: str
 
 router = APIRouter(tags=["Users"])
 
@@ -58,6 +63,20 @@ async def get_my_bookings(
     return await user_service.get_user_booking_history(
         str(current_user.id), skip, limit, db
     )
+
+
+@router.post(
+    "/me/fcm-token",
+    summary="Register FCM push notification token",
+    status_code=status.HTTP_200_OK,
+)
+async def register_fcm_token(
+    data: FcmTokenRequest,
+    current_user: UserDocument = Depends(get_current_active_user),
+    db: Any = Depends(get_database),
+):
+    """Register or refresh an FCM token for push notifications."""
+    return await notification_service.register_fcm_token(str(current_user.id), data.token, db)
 
 
 @router.delete("/me", summary="Deactivate account")

@@ -14,6 +14,7 @@ from .tracking import router as tracking_router
 from .reviews import router as reviews_router
 from .earnings import router as earnings_router
 from .disputes import router as disputes_router
+from .trips import router as trips_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -31,3 +32,4 @@ v1_router.include_router(tracking_router)
 v1_router.include_router(reviews_router, prefix="/reviews")
 v1_router.include_router(earnings_router, prefix="/earnings")
 v1_router.include_router(disputes_router, prefix="/disputes")
+v1_router.include_router(trips_router)

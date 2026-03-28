@@ -32,6 +32,16 @@ async def initiate_payment(
     return await payment_service.initiate_payment(str(current_user.id), request, db)
 
 
+@router.post("/create-order", response_model=InitiatePaymentResponse)
+async def create_order(
+    request: InitiatePaymentRequest,
+    current_user: UserDocument = Depends(get_current_user),
+    db: Any = Depends(get_database),
+):
+    """Alias for /initiate — create a Razorpay order for a confirmed booking."""
+    return await payment_service.initiate_payment(str(current_user.id), request, db)
+
+
 @router.post("/verify", response_model=VerifyPaymentResponse)
 async def verify_payment(
     request: VerifyPaymentRequest,

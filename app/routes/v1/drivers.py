@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.database import get_database
 from app.core.security import get_current_active_user, get_current_admin, get_current_driver
-from app.enums.common import DriverStatus
+from app.enums.common import DriverStatus, TripStatus
 from app.models.user import UserDocument
 from app.schemas.driver import (
     AvailabilityToggle,
@@ -15,8 +15,9 @@ from app.schemas.driver import (
     DriverUpdate,
     SuspendRequest,
 )
+from app.schemas.trip import TripCreate, TripResponse, TripUpdate
 from app.schemas.vehicle import VehicleCreate, VehicleResponse, VehicleUpdate
-from app.services import driver_service
+from app.services import driver_service, trip_service
 
 router = APIRouter(tags=["Drivers"])
 
@@ -137,6 +138,69 @@ async def update_my_vehicle(
     return await driver_service.update_vehicle(
         str(current_user.id), vehicle_id, data, db
     )
+
+
+# ── Trip management ────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/me/trips",
+    response_model=TripResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new trip listing",
+)
+async def create_trip(
+    data: TripCreate,
+    current_user: UserDocument = Depends(get_current_driver),
+    db: Any = Depends(get_database),
+):
+    """Driver lists a new trip on a fixed route."""
+    return await trip_service.create_trip(str(current_user.id), data, db)
+
+
+@router.get(
+    "/me/trips",
+    summary="List own trips",
+)
+async def list_my_trips(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    trip_status: Optional[TripStatus] = Query(default=None, alias="status"),
+    current_user: UserDocument = Depends(get_current_driver),
+    db: Any = Depends(get_database),
+):
+    """Paginated list of trips created by the current driver."""
+    return await trip_service.list_driver_trips(
+        str(current_user.id), skip, limit, db, trip_status=trip_status
+    )
+
+
+@router.put(
+    "/me/trips/{trip_id}",
+    response_model=TripResponse,
+    summary="Update a trip",
+)
+async def update_my_trip(
+    trip_id: str,
+    data: TripUpdate,
+    current_user: UserDocument = Depends(get_current_driver),
+    db: Any = Depends(get_database),
+):
+    """Update departure time, fare, notes, or status of a trip you own."""
+    return await trip_service.update_trip(trip_id, str(current_user.id), data, db)
+
+
+@router.delete(
+    "/me/trips/{trip_id}",
+    summary="Cancel a trip",
+)
+async def cancel_my_trip(
+    trip_id: str,
+    current_user: UserDocument = Depends(get_current_driver),
+    db: Any = Depends(get_database),
+):
+    """Cancel a scheduled trip."""
+    return await trip_service.cancel_trip(trip_id, str(current_user.id), db)
 
 
 # ── Admin routes ───────────────────────────────────────────────────────────
