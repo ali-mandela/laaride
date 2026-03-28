@@ -12,15 +12,18 @@ from app.core.database import (
     BOOKINGS_COLLECTION,
     DRIVERS_COLLECTION,
     ROUTES_COLLECTION,
+    TRIPS_COLLECTION,
     VEHICLES_COLLECTION,
 )
 from app.enums.common import (
     AvailabilityStatus,
     BookingStatus,
     DriverStatus,
+    TripStatus,
     VehicleType,
 )
 from app.schemas.route import RouteResponse
+from app.schemas.trip import TripResponse
 from app.services.osrm_service import get_route_info
 
 logger = logging.getLogger(__name__)
@@ -475,3 +478,47 @@ async def get_trip_summary(route_id: str, trip_date: date, db: Any) -> dict:
         "is_peak_season": is_peak_season,
         "weather_advisory": weather_advisory,
     }
+
+
+# ── 8. Search Trips (frontend primary search) ─────────────────────────────
+
+
+async def search_trips_for_passengers(
+    db: Any,
+    origin: Optional[str] = None,
+    destination: Optional[str] = None,
+    trip_date: Optional[date] = None,
+    seats: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 20,
+) -> dict:
+    """
+    Search driver-listed trips by origin, destination, date and seat availability.
+    This is the primary passenger-facing search — returns TripResponse objects.
+    """
+    query: dict = {"status": TripStatus.SCHEDULED}
+
+    if origin:
+        query["origin.name"] = {"$regex": origin, "$options": "i"}
+    if destination:
+        query["destination.name"] = {"$regex": destination, "$options": "i"}
+    if trip_date:
+        query["trip_date"] = trip_date.isoformat()
+    if seats:
+        query["available_seats"] = {"$gte": seats}
+
+    total = await db[TRIPS_COLLECTION].count_documents(query)
+    cursor = (
+        db[TRIPS_COLLECTION]
+        .find(query)
+        .sort([("trip_date", 1), ("departure_time", 1)])
+        .skip(skip)
+        .limit(limit)
+    )
+    trips = [TripResponse(**doc).model_dump() async for doc in cursor]
+    # Ensure _id is serialised as string
+    for t in trips:
+        if t.get("id") is None and t.get("_id"):
+            t["id"] = str(t["_id"])
+
+    return {"data": trips, "total": total, "skip": skip, "limit": limit}
