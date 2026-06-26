@@ -33,6 +33,7 @@ from app.middleware import RequestIDMiddleware, get_request_id
 from app.middleware.logging import LoggingMiddleware
 from app.routes.v1 import v1_router
 from app.routes.v1.default import router as default_router
+from app.services import tracking_service_redis
 
 logger = get_logger("laaride.main")
 
@@ -144,7 +145,16 @@ async def lifespan(app: FastAPI):
     # Initialise Firebase (graceful — no-op if credentials absent)
     setup_firebase(settings.FIREBASE_PROJECT_ID, settings.FIREBASE_SERVICE_ACCOUNT_KEY)
 
+    # Initialize Redis for tracking (graceful fallback to in-memory if unavailable)
+    if settings.REDIS_URL:
+        await tracking_service_redis.initialize_redis(settings.REDIS_URL)
+    else:
+        logger.info("Redis tracking disabled: no REDIS_URL configured")
+
     yield
+
+    # Cleanup Redis connection
+    await tracking_service_redis.close_redis()
 
     db_instance.client.close()
     logger.info("shutdown_complete")
@@ -157,6 +167,8 @@ app = FastAPI(
     version=settings.VERSION,
     description="A scalable transport infrastructure for Ladakh",
     lifespan=lifespan,
+    docs_url="/api/docs" if not settings.IS_DEVELOPMENT else "/docs",
+    openapi_url="/api/openapi.json" if not settings.IS_DEVELOPMENT else "/openapi.json",
 )
 
 # Rate limiter state
@@ -270,12 +282,19 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 
 # 3. CORS
+cors_origins = settings.ALLOWED_ORIGINS_PROD if settings.ALLOWED_ORIGINS_PROD else settings.ALLOWED_ORIGINS
+if settings.IS_DEVELOPMENT:
+    logger.info("CORS enabled for development", origins=cors_origins)
+else:
+    logger.warning("CORS configured for production", origins=cors_origins)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
+    max_age=600,  # Cache CORS preflight for 10 minutes
 )
 
 # 4. Logging middleware

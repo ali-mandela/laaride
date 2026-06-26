@@ -11,11 +11,13 @@ import logging
 from typing import Optional
 
 import requests
+import time
 
 logger = logging.getLogger(__name__)
 
 _OSRM_BASE = "http://router.project-osrm.org/route/v1/driving"
 _TIMEOUT = 8  # seconds
+_MAX_RETRIES = 3
 
 
 class RouteInfo:
@@ -35,7 +37,7 @@ def get_route_info(
     dest_lat: float,
     dest_lng: float,
 ) -> Optional[RouteInfo]:
-    """Fetch driving distance and duration from OSRM.
+    """Fetch driving distance and duration from OSRM with automatic retry.
 
     Returns None on failure — callers should fall back to user-supplied values.
 
@@ -47,36 +49,48 @@ def get_route_info(
     coords = f"{origin_lng},{origin_lat};{dest_lng},{dest_lat}"
     url = f"{_OSRM_BASE}/{coords}"
 
-    try:
-        resp = requests.get(
-            url,
-            params={"overview": "false", "steps": "false"},
-            timeout=_TIMEOUT,
-            headers={"User-Agent": "LaaRide/1.0 (laaride.app)"},
-        )
-        data = resp.json()
+    for attempt in range(_MAX_RETRIES):
+        try:
+            resp = requests.get(
+                url,
+                params={"overview": "false", "steps": "false"},
+                timeout=_TIMEOUT,
+                headers={"User-Agent": "LaaRide/1.0 (laaride.app)"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
-        if data.get("code") != "Ok" or not data.get("routes"):
-            logger.warning("osrm_no_route", code=data.get("code"), coords=coords)
+            if data.get("code") != "Ok" or not data.get("routes"):
+                logger.warning("osrm_no_route", code=data.get("code"), coords=coords)
+                return None
+
+            route = data["routes"][0]
+            distance_km = route["distance"] / 1000  # metres → km
+            duration_minutes = int(route["duration"] / 60)  # seconds → minutes
+
+            logger.info(
+                "osrm_route_fetched",
+                distance_km=round(distance_km, 1),
+                duration_minutes=duration_minutes,
+            )
+            return RouteInfo(distance_km=distance_km, duration_minutes=duration_minutes)
+
+        except requests.Timeout:
+            logger.warning(f"osrm_timeout attempt {attempt + 1}/{_MAX_RETRIES}", coords=coords)
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+            continue
+        except requests.RequestException as exc:
+            logger.warning(f"osrm_request_error attempt {attempt + 1}/{_MAX_RETRIES}", error=str(exc), coords=coords)
+            if attempt < _MAX_RETRIES - 1:
+                time.sleep(2 ** attempt)
+            continue
+        except Exception as exc:
+            logger.error("osrm_error", error=str(exc), coords=coords)
             return None
 
-        route = data["routes"][0]
-        distance_km = route["distance"] / 1000  # metres → km
-        duration_minutes = int(route["duration"] / 60)  # seconds → minutes
-
-        logger.info(
-            "osrm_route_fetched",
-            distance_km=round(distance_km, 1),
-            duration_minutes=duration_minutes,
-        )
-        return RouteInfo(distance_km=distance_km, duration_minutes=duration_minutes)
-
-    except requests.Timeout:
-        logger.warning("osrm_timeout", coords=coords)
-        return None
-    except Exception as exc:
-        logger.error("osrm_error", error=str(exc))
-        return None
+    logger.error("osrm_all_retries_failed", coords=coords)
+    return None
 
 
 def estimate_fare(distance_km: float, base_fare_per_km: float = 4.0, min_fare: float = 50.0) -> float:

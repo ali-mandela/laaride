@@ -26,8 +26,14 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
 
-    # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8081"]
+    # CORS - default to localhost for dev, should be overridden in production
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:8081",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8081",
+    ]
+    ALLOWED_ORIGINS_PROD: Optional[list[str]] = None  # Set via env var for production
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True
