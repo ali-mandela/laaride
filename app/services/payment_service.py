@@ -3,12 +3,12 @@
 import hashlib
 import hmac
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from bson import ObjectId, errors
 
 from app.core.config import settings
-from app.core.database import BOOKINGS_COLLECTION, DRIVERS_COLLECTION, USERS_COLLECTION
+from app.core.database import BOOKINGS_COLLECTION, DRIVERS_COLLECTION
 from app.core.exceptions import (
     ExternalServiceError,
     NotFoundError,

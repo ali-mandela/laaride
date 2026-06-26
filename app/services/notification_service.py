@@ -1,6 +1,5 @@
 """Notification service — FCM push notifications + in-app notification management."""
 
-import json
 from datetime import datetime
 from typing import Any, Optional
 

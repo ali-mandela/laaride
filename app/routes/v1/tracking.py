@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.database import get_database, BOOKINGS_COLLECTION, DRIVERS_COLLECTION
-from app.core.security import get_current_user, require_role, verify_token
+from app.core.security import get_current_user, verify_token
 from app.enums.common import UserRole
 from app.services import tracking_service
 

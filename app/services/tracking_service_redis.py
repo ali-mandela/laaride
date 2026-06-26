@@ -7,7 +7,6 @@ Fallback: If Redis is unavailable, falls back to in-memory tracking (single-inst
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import redis.asyncio as redis

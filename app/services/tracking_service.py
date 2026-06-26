@@ -5,7 +5,6 @@ For production, swap the store with Redis pub/sub for multi-instance support.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import datetime
 from typing import Optional

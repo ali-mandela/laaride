@@ -11,7 +11,7 @@ from app.core.database import (
     USERS_COLLECTION,
     VEHICLES_COLLECTION,
 )
-from app.core.exceptions import NotFoundError, ValidationError, AuthorizationError, ConflictError
+from app.core.exceptions import NotFoundError, ValidationError, AuthorizationError
 from app.core.logging import get_logger
 from app.enums.common import (
     AvailabilityStatus,
@@ -79,7 +79,7 @@ async def apply_as_driver(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    if not user.get("is_active", True) is True:
+    if user.get("is_active", True) is not True:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="User account is inactive"
         )
