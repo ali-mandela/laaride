@@ -282,6 +282,37 @@ async def update_vehicle(
     return VehicleResponse(**updated)
 
 
+async def delete_vehicle(user_id: str, vehicle_id: str, db: Any) -> dict:
+    """Delete a vehicle — verify it belongs to the requesting driver."""
+    driver = await db[DRIVERS_COLLECTION].find_one({"user_id": user_id})
+    if not driver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Driver profile not found"
+        )
+
+    veh_obj_id = _to_object_id(vehicle_id, "Vehicle ID")
+    vehicle = await db[VEHICLES_COLLECTION].find_one({"_id": veh_obj_id})
+    if not vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Vehicle not found"
+        )
+
+    if vehicle["driver_id"] != str(driver["_id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own vehicles",
+        )
+
+    result = await db[VEHICLES_COLLECTION].delete_one({"_id": veh_obj_id})
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete vehicle",
+        )
+
+    return {"message": "Vehicle deleted successfully"}
+
+
 # ── Stats ──────────────────────────────────────────────────────────────────
 
 

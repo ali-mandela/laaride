@@ -140,6 +140,19 @@ async def update_my_vehicle(
     )
 
 
+@router.delete(
+    "/me/vehicles/{vehicle_id}",
+    summary="Delete a vehicle",
+)
+async def delete_my_vehicle(
+    vehicle_id: str,
+    current_user: UserDocument = Depends(get_current_driver),
+    db: Any = Depends(get_database),
+):
+    """Delete a vehicle you own."""
+    return await driver_service.delete_vehicle(str(current_user.id), vehicle_id, db)
+
+
 # ── Trip management ────────────────────────────────────────────────────────
 
 
